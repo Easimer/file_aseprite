@@ -80,19 +80,21 @@ type LayerBlendMode* {.pure.} = enum
   Subtract
   Divide
 
+type Layer = object
+  flags: HashSet[LayerFlags]
+  layerType: LayerType
+  layerChildLevel: int
+  blendMode: LayerBlendMode
+  opacity: float
+  name: string
+
 type Chunk = ref object
   case kind: ChunkType
-  of LayerChunk:
-    flags: HashSet[LayerFlags]
-    layerType: LayerType
-    layerChildLevel: int
-    blendMode: LayerBlendMode
-    opacity: float
-    name: string
+  of LayerChunk: layer: Layer
   else: nil
 
 type Frame = object
-    layers: seq[Chunk]
+    layers: seq[Layer]
 
 converter toLayerFlags(flags: uint16): HashSet[LayerFlags] =
   ## Converts a bitfield to a set of LayerFlags
@@ -150,16 +152,16 @@ proc readChunk(stream: FileStream): Chunk =
 
   case chunkHeader.chunkType:
     of LayerChunk:
-      result.flags = stream.readUint16()
-      result.layerType = stream.readUint16()
-      result.layerChildLevel = cast[int](stream.readUint16())
+      result.layer.flags = stream.readUint16()
+      result.layer.layerType = stream.readUint16()
+      result.layer.layerChildLevel = cast[int](stream.readUint16())
       discard stream.readUint16() # Default layer width in px
       discard stream.readUint16() # Default layer height in px
-      result.blendMode = stream.readUint16()
-      result.opacity =  stream.readUint8().float / 255.0f
+      result.layer.blendMode = stream.readUint16()
+      result.layer.opacity =  stream.readUint8().float / 255.0f
       for i in 0..2:
         discard stream.readUint8()
-      result.name = stream.readStr(cast[int](stream.readUint16()))
+      result.layer.name = stream.readStr(cast[int](stream.readUint16()))
     else:
       # Skip chunk
       echo("Skipping " & $chunkHeader.size)
@@ -183,7 +185,7 @@ proc readFrame*(stream: FileStream): Frame =
     let chunk = readChunk(stream)
     case chunk.kind:
       of LayerChunk:
-        result.layers.add(chunk)
+        result.layers.add(chunk.layer)
       else:
         echo("Unknown chunk")
     
