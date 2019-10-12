@@ -11,17 +11,4 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Lesser General Public License for more details.
 
-import streams
-import fmt/common
-import fmt/header
-import fmt/frame
-
-type AsepriteImage = object
-
-proc loadSprite*(path: string): AsepriteImage =
-  let file = open(path, fmRead)
-  defer: close(file)
-  let stream = newFileStream(file)
-  let hdr = readHeader(stream)
-
-  echo(hdr)
+type AsepriteError* = object of Exception
