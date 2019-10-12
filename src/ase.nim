@@ -12,9 +12,9 @@
 # Lesser General Public License for more details.
 
 import streams
-import fmt/common
-import fmt/header
-import fmt/frame
+import ase/common
+import ase/header
+import ase/frame
 
 type AsepriteImage = object
 
