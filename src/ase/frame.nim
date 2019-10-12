@@ -92,6 +92,7 @@ type Chunk = ref object
   else: nil
 
 type Frame = object
+    layers: seq[Chunk]
 
 converter toLayerFlags(flags: uint16): HashSet[LayerFlags] =
   ## Converts a bitfield to a set of LayerFlags
@@ -179,4 +180,10 @@ proc readFrame*(stream: FileStream): Frame =
     else: hdr.chunkCount
   
   for chunkIdx in 0..chunkCount-1:
-    discard readChunk(stream)
+    let chunk = readChunk(stream)
+    case chunk.kind:
+      of LayerChunk:
+        result.layers.add(chunk)
+      else:
+        echo("Unknown chunk")
+    
