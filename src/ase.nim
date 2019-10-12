@@ -17,6 +17,9 @@ import ase/header
 import ase/frame
 
 type AsepriteImage = object
+  width*: int
+  height*: int
+  frames: seq[Frame]
 
 proc loadSprite*(path: string): AsepriteImage =
   let file = open(path, fmRead)
@@ -24,6 +27,11 @@ proc loadSprite*(path: string): AsepriteImage =
   let stream = newFileStream(file)
   let hdr = readHeader(stream)
 
+  result.width = cast[int](hdr.width)
+  result.height = cast[int](hdr.height)
+
   for frameIdx in 0 .. cast[int](hdr.frames-1):
-    echo("Frame #" & $frameIdx)
-    discard readFrame(stream)
+    result.frames.add(readFrame(stream, hdr))
+
+proc rasterizeFrame*(img: AsepriteImage, frame: int): seq[uint8] =
+  result.setLen(img.width * img.height * 4)

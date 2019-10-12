@@ -11,8 +11,13 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Lesser General Public License for more details.
 
-import streams
 import sets
+import sequtils
+import streams
+
+import miniz
+
+import header
 
 type FrameHeader* = object
   length: uint32
@@ -80,20 +85,48 @@ type LayerBlendMode* {.pure.} = enum
   Subtract
   Divide
 
-type Layer = object
+type CelType* {.pure.} = enum
+  Unknown
+  Raw
+  Linked
+  Compressed
+
+type CelDetails* = ref object
+  width: int
+  height: int
+  case kind: CelType
+  of Raw:
+    pixelData: seq[uint8]
+  of Linked:
+    linkedWith: int
+  of Compressed:
+    compressedPixelData: seq[uint8]
+    # TODO: provide function to decompress this
+  else: nil
+
+type CelData* = object
+  layerIndex: int
+  positionX: int
+  positionY: int
+  opacity: float
+  details: CelDetails
+
+type Layer* = object
   flags: HashSet[LayerFlags]
   layerType: LayerType
   layerChildLevel: int
   blendMode: LayerBlendMode
   opacity: float
   name: string
+  cels: seq[CelData]
 
 type Chunk = ref object
   case kind: ChunkType
   of LayerChunk: layer: Layer
+  of CelChunk: celData: CelData
   else: nil
 
-type Frame = object
+type Frame* = object
     layers: seq[Layer]
 
 converter toLayerFlags(flags: uint16): HashSet[LayerFlags] =
@@ -143,12 +176,57 @@ converter toBlendMode(blendMode: uint16): LayerBlendMode =
     of 18: LayerBlendMode.Divide
     else: LayerBlendMode.Unknown
 
-proc readChunk(stream: FileStream): Chunk =
+converter toCelType(celType: uint16): CelType =
+  case celType:
+    of 0: CelType.Raw
+    of 1: CelType.Linked
+    of 2: CelType.Compressed
+    else: CelType.Unknown
+
+proc fromString(s: cstring): seq[uint8] =
+  for ch in s:
+    result.add(cast[uint8](ch))
+
+proc readCelDetails(stream: FileStream, hdr: Header, chunkSize: uint32): CelData =
+  echo("Reading cel")
+  result.layerIndex = cast[int](stream.readUint16())
+  result.positionX = cast[int](stream.readInt16())
+  result.positionY = cast[int](stream.readInt16())
+  result.opacity =  stream.readUint8().float / 255.0f
+  result.details = CelDetails(kind: stream.readUint16())
+  for i in 0..6:
+    discard stream.readUint8()
+  echo($result)
+  let pixelSize = cast[int](hdr.depth shr 3)
+  case result.details.kind:
+    of CelType.Raw:
+      result.details.width = cast[int](stream.readUint16())
+      result.details.height = cast[int](stream.readUint16())
+      let bufSize = pixelSize * result.details.width * result.details.height
+      result.details.pixelData.setLen(bufSize)
+      discard stream.readData(addr(result.details.pixelData[0]), bufSize)
+    of CelType.Linked:
+      result.details.linkedWith = cast[int](stream.readUint16())
+    of CelType.Compressed:
+      # Redefine as raw
+      result.details = CelDetails(kind: CelType.Raw)
+      result.details.width = cast[int](stream.readUint16())
+      result.details.height = cast[int](stream.readUint16())
+      let inflatedSize = pixelSize * result.details.width * result.details.height
+      let deflatedSize = chunkSize - 20 # Header is twenty bytes long
+      var compressedData = stream.readStr(cast[int](deflatedSize))
+      let decompressedData = miniz.uncompress(compressedData)
+      result.details.pixelData = fromString(decompressedData)
+      
+    else: discard nil
+
+proc readChunk(stream: FileStream, hdr: Header): Chunk =
   ## Read a single chunk from the stream
   var chunkHeader: ChunkHeader
   chunkHeader.size = stream.readUint32() - 6
   chunkHeader.chunkType = cast[ChunkType](stream.readUint16())
   result = Chunk(kind: chunkHeader.chunkType)
+  let seekStart = stream.getPosition()
 
   case chunkHeader.chunkType:
     of LayerChunk:
@@ -162,12 +240,14 @@ proc readChunk(stream: FileStream): Chunk =
       for i in 0..2:
         discard stream.readUint8()
       result.layer.name = stream.readStr(cast[int](stream.readUint16()))
+    of CelChunk:
+      result.celData = readCelDetails(stream, hdr, chunkHeader.size)
     else:
       # Skip chunk
       echo("Skipping " & $chunkHeader.size)
-      stream.setPosition(stream.getPosition() + cast[int](chunkHeader.size))
+  stream.setPosition(seekStart + cast[int](chunkHeader.size))
 
-proc readFrame*(stream: FileStream): Frame =
+proc readFrame*(stream: FileStream, header: Header): Frame =
   var hdr: FrameHeader
   hdr.length = stream.readUint32()
   hdr.magic = stream.readUint16()
@@ -182,10 +262,10 @@ proc readFrame*(stream: FileStream): Frame =
     else: hdr.chunkCount
   
   for chunkIdx in 0..chunkCount-1:
-    let chunk = readChunk(stream)
+    let chunk = readChunk(stream, header)
     case chunk.kind:
       of LayerChunk:
         result.layers.add(chunk.layer)
       else:
-        echo("Unknown chunk")
+        echo("Unknown chunk " & $chunk.kind)
     

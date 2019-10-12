@@ -11,3 +11,4 @@ backend       = "cpp"
 # Dependencies
 
 requires "nim >= 0.18.0"
+requires "miniz >= 0.1.0"
