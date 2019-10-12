@@ -73,6 +73,5 @@ proc readHeader*(stream: FileStream): Header =
   result.gridWidth = stream.readUint16()
   result.gridHeight = stream.readUint16()
   # Skip EOH padding
-  for i in 0..83:
-    discard stream.readUint8()
+  stream.setPosition(128)
   

@@ -24,4 +24,6 @@ proc loadSprite*(path: string): AsepriteImage =
   let stream = newFileStream(file)
   let hdr = readHeader(stream)
 
-  echo(hdr)
+  for frameIdx in 0 .. cast[int](hdr.frames-1):
+    echo("Frame #" & $frameIdx)
+    discard readFrame(stream)
