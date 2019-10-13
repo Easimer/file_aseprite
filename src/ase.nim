@@ -94,7 +94,6 @@ proc rasterizeLayer*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8
               #alphaBlendOver(result, cel.details.pixelData, offBuffer, offCel)
               for b in 0..2:
                 result[offBuffer + b] = cel.details.pixelData[offCel + b]
-              # TODO: factor in pixel alpha
               result[offBuffer + 3] = blendAlphas(cel.details.pixelData[offCel + 3], layer.opacity)
       else:
         echo("layer is invisible")
