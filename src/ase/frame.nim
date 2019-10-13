@@ -92,33 +92,32 @@ type CelType* {.pure.} = enum
   Compressed
 
 type CelDetails* = ref object
-  width: int
-  height: int
+  width*: int
+  height*: int
   case kind: CelType
   of Raw:
-    pixelData: seq[uint8]
+    pixelData*: seq[uint8]
   of Linked:
-    linkedWith: int
-  of Compressed:
-    compressedPixelData: seq[uint8]
-    # TODO: provide function to decompress this
+    linkedWith*: int
+  of Compressed: nil
   else: nil
 
 type CelData* = object
   layerIndex: int
-  positionX: int
-  positionY: int
-  opacity: float
-  details: CelDetails
+  positionX*: int
+  positionY*: int
+  opacity: int
+  details*: CelDetails
 
 type Layer* = object
   flags: HashSet[LayerFlags]
-  layerType: LayerType
+  visible*: bool
+  layerType*: LayerType
   layerChildLevel: int
-  blendMode: LayerBlendMode
-  opacity: float
-  name: string
-  cels: seq[CelData]
+  blendMode*: LayerBlendMode
+  opacity*: int
+  name*: string
+  cels*: seq[CelData]
 
 type Chunk = ref object
   case kind: ChunkType
@@ -127,7 +126,7 @@ type Chunk = ref object
   else: nil
 
 type Frame* = object
-    layers: seq[Layer]
+    layers*: seq[Layer]
 
 converter toLayerFlags(flags: uint16): HashSet[LayerFlags] =
   ## Converts a bitfield to a set of LayerFlags
@@ -183,7 +182,7 @@ converter toCelType(celType: uint16): CelType =
     of 2: CelType.Compressed
     else: CelType.Unknown
 
-proc fromString(s: cstring): seq[uint8] =
+proc fromString(s: string): seq[uint8] =
   for ch in s:
     result.add(cast[uint8](ch))
 
@@ -192,12 +191,12 @@ proc readCelDetails(stream: FileStream, hdr: Header, chunkSize: uint32): CelData
   result.layerIndex = cast[int](stream.readUint16())
   result.positionX = cast[int](stream.readInt16())
   result.positionY = cast[int](stream.readInt16())
-  result.opacity =  stream.readUint8().float / 255.0f
+  result.opacity =  cast[int](stream.readUint8())
   result.details = CelDetails(kind: stream.readUint16())
   for i in 0..6:
     discard stream.readUint8()
   echo($result)
-  let pixelSize = cast[int](hdr.depth shr 3)
+  let pixelSize = cast[int](hdr.depth div 8)
   case result.details.kind:
     of CelType.Raw:
       result.details.width = cast[int](stream.readUint16())
@@ -216,7 +215,9 @@ proc readCelDetails(stream: FileStream, hdr: Header, chunkSize: uint32): CelData
       let deflatedSize = chunkSize - 20 # Header is twenty bytes long
       var compressedData = stream.readStr(cast[int](deflatedSize))
       let decompressedData = miniz.uncompress(compressedData)
+      assert decompressedData.len() == inflatedSize
       result.details.pixelData = fromString(decompressedData)
+      assert result.details.pixelData.len() == inflatedSize
       
     else: discard nil
 
@@ -232,11 +233,12 @@ proc readChunk(stream: FileStream, hdr: Header): Chunk =
     of LayerChunk:
       result.layer.flags = stream.readUint16()
       result.layer.layerType = stream.readUint16()
+      result.layer.visible = result.layer.flags.contains(LayerFlags.Visible)
       result.layer.layerChildLevel = cast[int](stream.readUint16())
       discard stream.readUint16() # Default layer width in px
       discard stream.readUint16() # Default layer height in px
       result.layer.blendMode = stream.readUint16()
-      result.layer.opacity =  stream.readUint8().float / 255.0f
+      result.layer.opacity =  cast[int](stream.readUint8())
       for i in 0..2:
         discard stream.readUint8()
       result.layer.name = stream.readStr(cast[int](stream.readUint16()))
@@ -244,7 +246,7 @@ proc readChunk(stream: FileStream, hdr: Header): Chunk =
       result.celData = readCelDetails(stream, hdr, chunkHeader.size)
     else:
       # Skip chunk
-      echo("Skipping " & $chunkHeader.size)
+      discard nil
   stream.setPosition(seekStart + cast[int](chunkHeader.size))
 
 proc readFrame*(stream: FileStream, header: Header): Frame =
@@ -262,10 +264,11 @@ proc readFrame*(stream: FileStream, header: Header): Frame =
     else: hdr.chunkCount
   
   for chunkIdx in 0..chunkCount-1:
-    let chunk = readChunk(stream, header)
+    var chunk = readChunk(stream, header)
     case chunk.kind:
       of LayerChunk:
         result.layers.add(chunk.layer)
+      of CelChunk:
+        result.layers[chunk.celData.layerIndex].cels.add(chunk.celData)
       else:
         echo("Unknown chunk " & $chunk.kind)
-    
