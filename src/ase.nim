@@ -28,11 +28,11 @@ proc loadSprite*(path: string): AsepriteImage =
   let stream = newFileStream(file)
   let hdr = readHeader(stream)
 
-  result.width = cast[int](hdr.width)
-  result.height = cast[int](hdr.height)
-  result.depth = cast[int](hdr.depth)
+  result.width = hdr.width
+  result.height = hdr.height
+  result.depth = hdr.depth
 
-  for frameIdx in 0 .. cast[int](hdr.frames-1):
+  for frameIdx in 0 .. hdr.frames - 1:
     result.frames.add(readFrame(stream, hdr))
 
 proc alphaBlendOver(dst: var seq[uint8], src: seq[uint8], offDst: int, offSrc: int) =
