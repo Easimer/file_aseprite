@@ -113,7 +113,7 @@ type Layer* = object
   flags: HashSet[LayerFlags]
   visible*: bool
   layerType*: LayerType
-  layerChildLevel: int
+  layerChildLevel*: int
   blendMode*: LayerBlendMode
   opacity*: int
   name*: string

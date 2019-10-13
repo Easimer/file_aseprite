@@ -16,13 +16,14 @@ import ase/common
 import ase/header
 import ase/frame
 
-type AsepriteImage = object
+type AsepriteImage* = ref object
   width*: int
   height*: int
   depth*: int
   frames: seq[Frame]
 
 proc loadSprite*(path: string): AsepriteImage =
+  new(result)
   let file = open(path, fmRead)
   defer: close(file)
   let stream = newFileStream(file)
@@ -37,6 +38,9 @@ proc loadSprite*(path: string): AsepriteImage =
 
 proc numberOfFrames*(img: AsepriteImage): int = len(img.frames)
 proc numberOfLayers*(img: AsepriteImage, frame: int): int = len(img.frames[frame].layers)
+proc layerName*(img: AsepriteImage, frame: int, layer: int): string = img.frames[frame].layers[layer].name
+proc isLayerGroup*(img: AsepriteImage, frame: int, layer: int): bool = img.frames[frame].layers[layer].layerType == LayerType.Group
+proc getLayerLevel*(img: AsepriteImage, frame: int, layer: int): int = img.frames[frame].layers[layer].layerChildLevel
 
 proc rasterizeLayer*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8] =
   if frame >= 0 and frame < len(img.frames):
@@ -52,8 +56,6 @@ proc rasterizeLayer*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8
           let imgWidth = img.width
           let celHeight = cel.details.height
           let celWidth = cel.details.width
-          
-          echo((len(cel.details.pixelData), celWidth * celHeight * pixSize))
 
           for y in 0 .. celHeight - 1:
             for x in 0 .. celWidth - 1:
