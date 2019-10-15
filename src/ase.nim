@@ -50,7 +50,6 @@ proc rasterizeLayer*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8
     if layerIndex >= 0 and layerIndex < len(frame.layers):
       let layer = frame.layers[layerIndex]
       if layer.visible:
-        echo(len(layer.cels))
         for cel in layer.cels:
           let imgHeight = img.height
           let imgWidth = img.width
@@ -68,8 +67,6 @@ proc rasterizeLayer*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8
               # TODO: This is fine if a layer only has one cel
               if cel.details.pixelData[offCel + 3] != 0:
                 result[offBuffer + 3] = cast[uint8](layer.opacity)
-      else:
-        echo("layer is invisible")
     else:
       raise newException(IndexError, "Layer index is out of bounds!")
   else:

@@ -187,7 +187,6 @@ proc fromString(s: string): seq[uint8] =
     result.add(cast[uint8](ch))
 
 proc readCelDetails(stream: FileStream, hdr: Header, chunkSize: uint32): CelData =
-  echo("Reading cel")
   result.layerIndex = cast[int](stream.readUint16())
   result.positionX = cast[int](stream.readInt16())
   result.positionY = cast[int](stream.readInt16())
@@ -195,7 +194,6 @@ proc readCelDetails(stream: FileStream, hdr: Header, chunkSize: uint32): CelData
   result.details = CelDetails(kind: stream.readUint16())
   for i in 0..6:
     discard stream.readUint8()
-  echo($result)
   let pixelSize = cast[int](hdr.depth div 8)
   case result.details.kind:
     of CelType.Raw:
@@ -270,5 +268,4 @@ proc readFrame*(stream: FileStream, header: Header): Frame =
         result.layers.add(chunk.layer)
       of CelChunk:
         result.layers[chunk.celData.layerIndex].cels.add(chunk.celData)
-      else:
-        echo("Unknown chunk " & $chunk.kind)
+      else: discard nil
