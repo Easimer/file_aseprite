@@ -127,6 +127,7 @@ type Chunk = ref object
 
 type Frame* = object
     layers*: seq[Layer]
+    duration*: int
 
 converter toLayerFlags(flags: uint16): HashSet[LayerFlags] =
   ## Converts a bitfield to a set of LayerFlags
@@ -255,6 +256,8 @@ proc readFrame*(stream: FileStream, header: Header): Frame =
   hdr.duration = stream.readUint16()
   discard stream.readUint16()
   hdr.chunkCount = stream.readUint32()
+
+  result.duration = int(hdr.duration)
 
   let chunkCount =
     case hdr.chunkCount
