@@ -41,6 +41,7 @@ proc numberOfLayers*(img: AsepriteImage, frame: int): int = len(img.frames[frame
 proc layerName*(img: AsepriteImage, frame: int, layer: int): string = img.frames[frame].layers[layer].name
 proc isLayerGroup*(img: AsepriteImage, frame: int, layer: int): bool = img.frames[frame].layers[layer].layerType == LayerType.Group
 proc getLayerLevel*(img: AsepriteImage, frame: int, layer: int): int = img.frames[frame].layers[layer].layerChildLevel
+proc isLayerVisible*(img: AsepriteImage, frame: int, layer: int): bool = img.frames[frame].layers[layer].visible
 
 proc rasterizeLayer*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8] =
   if frame >= 0 and frame < len(img.frames):
