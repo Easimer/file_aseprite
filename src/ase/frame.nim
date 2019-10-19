@@ -235,6 +235,9 @@ proc readCelDetails(stream: FileStream, hdr: Header, chunkSize: uint32): CelData
 
 proc readPalette(stream: FileStream, hdr: Header, chunkSize: uint32): seq[PaletteEntry] =
   # TODO: proper palette loading
+  # This works if there is only one palette chunk in the file.
+  # The structure of the chunk however implies that parts of the
+  # palette can be overwritten by chunks appearing later in the file.
   let numEntries = stream.readUint32()
   let firstEntryIdx = stream.readUint32()
   let lastEntryIdx = stream.readUint32()
