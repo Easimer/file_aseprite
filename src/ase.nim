@@ -16,6 +16,8 @@ import ase/common
 import ase/header
 import ase/frame
 
+## Asesprite file loader
+
 type AsepriteImage* = ref object
   width*: int
   height*: int
@@ -25,6 +27,7 @@ type AsepriteImage* = ref object
   palette: seq[PaletteEntry]
 
 proc loadSprite*(path: string): AsepriteImage =
+  ## Load a sprite from the local filesystem.
   new(result)
   let file = open(path, fmRead)
   defer: close(file)
@@ -49,28 +52,38 @@ proc loadSprite*(path: string): AsepriteImage =
     result.frames.add(frame)
 
 proc numberOfFrames*(img: AsepriteImage): int =
+  ## Get the number of frames in the sprite.
   len(img.frames)
 
 proc numberOfLayers*(img: AsepriteImage): int =
+  ## Get the number of layers in the sprite. This number includes image layers
+  ## and layer groups (both visible and invisible).
   len(img.layers)
 
 proc layerName*(img: AsepriteImage, layer: int): string =
+  ## Returns the name of the nth layer.
   img.layers[layer].name
 
 proc isLayerGroup*(img: AsepriteImage, layer: int): bool =
+  ## Returns whether the nth layer is a layer group or not.
   img.layers[layer].layerType == LayerType.Group
 
 proc getLayerLevel*(img: AsepriteImage, layer: int): int =
+  ## Returns the level of the nth layer. This number represents how deep
+  ## the layer can be found in the hierarchy. For layers on the top level
+  ## this number is 0. For layers contained within a group that is on the
+  ## top level the number returned is 1 and so on.
   img.layers[layer].layerChildLevel
 
 proc isLayerVisible*(img: AsepriteImage, layer: int): bool =
+  ## Returns whether the nth layer is visible or hidden.
   img.layers[layer].visible
 
 proc getFrameDuration*(img: AsepriteImage, frame: int): int =
   ## Returns the duration of a frame in milliseconds.
   img.frames[frame].duration
 
-proc rasterizeLayerRGBA*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8] =
+proc rasterizeLayerRGBA(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8] =
   if frame >= 0 and frame < len(img.frames):
     let pixSize = (img.depth div 8)
     result.setLen(img.width * img.height * pixSize)
@@ -98,7 +111,7 @@ proc rasterizeLayerRGBA*(img: AsepriteImage, frame: int, layerIndex: int): seq[u
   else:
     raise newException(IndexError, "Frame index is out of bounds!")
 
-proc rasterizeLayerGreyscale*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8] =
+proc rasterizeLayerGreyscale(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8] =
   if frame >= 0 and frame < len(img.frames):
     let pixSize = 2
     let outPixSize = 4
@@ -127,7 +140,7 @@ proc rasterizeLayerGreyscale*(img: AsepriteImage, frame: int, layerIndex: int): 
   else:
     raise newException(IndexError, "Frame index is out of bounds!")
 
-proc rasterizeLayerIndexed*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8] =
+proc rasterizeLayerIndexed(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8] =
   if frame >= 0 and frame < len(img.frames):
     let pixSize = 1
     let outPixSize = 4
@@ -161,6 +174,9 @@ proc rasterizeLayerIndexed*(img: AsepriteImage, frame: int, layerIndex: int): se
     raise newException(IndexError, "Frame index is out of bounds!")
 
 proc rasterizeLayer*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8] =
+  ## Rasterizes the nth layer on the mth frame of the image and returns the raw
+  ## pixel data. The pixel data is in R8G8B8A8 format.
+  ## Raises RangeError if the pixel depth of the sprite is not supported.
   case img.depth:
     of 32: rasterizeLayerRGBA(img, frame, layerIndex)
     of 8: rasterizeLayerIndexed(img, frame, layerIndex)
