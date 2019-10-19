@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.3.0"
+version       = "0.3.1"
 author        = "Daniel Meszaros"
 description   = "Loader for the Aseprite image format"
 license       = "LGPL-2.1"
