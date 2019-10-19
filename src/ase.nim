@@ -26,12 +26,9 @@ type AsepriteImage* = ref object
   frames: seq[Frame]
   palette: seq[PaletteEntry]
 
-proc loadSprite*(path: string): AsepriteImage =
-  ## Load a sprite from the local filesystem.
+proc loadSprite*(stream: Stream): AsepriteImage =
+  ## Load a sprite from an I/O stream.
   new(result)
-  let file = open(path, fmRead)
-  defer: close(file)
-  let stream = newFileStream(file)
   let hdr = readHeader(stream)
 
   result.width = hdr.width
@@ -50,6 +47,13 @@ proc loadSprite*(path: string): AsepriteImage =
     if len(pFrame.palette) != 0:
       result.palette = pFrame.palette
     result.frames.add(frame)
+
+proc loadSprite*(path: string): AsepriteImage =
+  ## Load a sprite from the local filesystem.
+  let file = open(path, fmRead)
+  defer: close(file)
+  let stream = newFileStream(file)
+  loadSprite(stream)
 
 proc numberOfFrames*(img: AsepriteImage): int =
   ## Get the number of frames in the sprite.

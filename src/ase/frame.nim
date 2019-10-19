@@ -200,7 +200,7 @@ proc fromString(s: string): seq[uint8] =
   for ch in s:
     result.add(cast[uint8](ch))
 
-proc readCelDetails(stream: FileStream, hdr: Header, chunkSize: uint32): CelData =
+proc readCelDetails(stream: Stream, hdr: Header, chunkSize: uint32): CelData =
   result.layerIndex = cast[int](stream.readUint16())
   result.positionX = cast[int](stream.readInt16())
   result.positionY = cast[int](stream.readInt16())
@@ -233,7 +233,7 @@ proc readCelDetails(stream: FileStream, hdr: Header, chunkSize: uint32): CelData
       
     else: discard nil
 
-proc readPalette(stream: FileStream, hdr: Header, chunkSize: uint32): seq[PaletteEntry] =
+proc readPalette(stream: Stream, hdr: Header, chunkSize: uint32): seq[PaletteEntry] =
   # TODO: proper palette loading
   # This works if there is only one palette chunk in the file.
   # The structure of the chunk however implies that parts of the
@@ -254,7 +254,7 @@ proc readPalette(stream: FileStream, hdr: Header, chunkSize: uint32): seq[Palett
       entry.Name = stream.readStr(lenName)
     result.add(entry)
 
-proc readChunk(stream: FileStream, hdr: Header): Chunk =
+proc readChunk(stream: Stream, hdr: Header): Chunk =
   ## Read a single chunk from the stream
   var chunkHeader: ChunkHeader
   chunkHeader.size = stream.readUint32() - 6
@@ -284,7 +284,7 @@ proc readChunk(stream: FileStream, hdr: Header): Chunk =
       discard nil
   stream.setPosition(seekStart + cast[int](chunkHeader.size))
 
-proc readFrame*(stream: FileStream, header: Header): PartialFrameData =
+proc readFrame*(stream: Stream, header: Header): PartialFrameData =
   var hdr: FrameHeader
   hdr.length = stream.readUint32()
   hdr.magic = stream.readUint16()

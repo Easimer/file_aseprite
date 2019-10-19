@@ -69,7 +69,7 @@ type Header* = object
   gridHeight*: int
   # !padding84ZeroBytes
 
-proc readHeader*(stream: FileStream): Header =
+proc readHeader*(stream: Stream): Header =
   result.fileSize = cast[int](stream.readUint32())
   result.magic = stream.readUint16()
 
