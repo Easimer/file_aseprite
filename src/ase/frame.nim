@@ -103,7 +103,7 @@ type CelDetails* = ref object
   else: nil
 
 type CelData* = object
-  layerIndex: int
+  layerIndex*: int
   positionX*: int
   positionY*: int
   opacity: int
@@ -117,7 +117,6 @@ type Layer* = object
   blendMode*: LayerBlendMode
   opacity*: int
   name*: string
-  cels*: seq[CelData]
 
 type Chunk = ref object
   case kind: ChunkType
@@ -126,8 +125,13 @@ type Chunk = ref object
   else: nil
 
 type Frame* = object
-    layers*: seq[Layer]
-    duration*: int
+  duration*: int
+  cels*: seq[CelData]
+
+type PartialFrameData* = ref object
+  duration*: int
+  layers*: seq[Layer]
+  cels*: seq[CelData]
 
 converter toLayerFlags(flags: uint16): HashSet[LayerFlags] =
   ## Converts a bitfield to a set of LayerFlags
@@ -233,11 +237,11 @@ proc readChunk(stream: FileStream, hdr: Header): Chunk =
       result.layer.flags = stream.readUint16()
       result.layer.layerType = stream.readUint16()
       result.layer.visible = result.layer.flags.contains(LayerFlags.Visible)
-      result.layer.layerChildLevel = cast[int](stream.readUint16())
+      result.layer.layerChildLevel = int(stream.readUint16())
       discard stream.readUint16() # Default layer width in px
       discard stream.readUint16() # Default layer height in px
       result.layer.blendMode = stream.readUint16()
-      result.layer.opacity =  cast[int](stream.readUint8())
+      result.layer.opacity = int(stream.readUint8())
       for i in 0..2:
         discard stream.readUint8()
       result.layer.name = stream.readStr(cast[int](stream.readUint16()))
@@ -248,7 +252,7 @@ proc readChunk(stream: FileStream, hdr: Header): Chunk =
       discard nil
   stream.setPosition(seekStart + cast[int](chunkHeader.size))
 
-proc readFrame*(stream: FileStream, header: Header): Frame =
+proc readFrame*(stream: FileStream, header: Header): PartialFrameData =
   var hdr: FrameHeader
   hdr.length = stream.readUint32()
   hdr.magic = stream.readUint16()
@@ -257,6 +261,7 @@ proc readFrame*(stream: FileStream, header: Header): Frame =
   discard stream.readUint16()
   hdr.chunkCount = stream.readUint32()
 
+  new(result)
   result.duration = int(hdr.duration)
 
   let chunkCount =
@@ -268,7 +273,9 @@ proc readFrame*(stream: FileStream, header: Header): Frame =
     var chunk = readChunk(stream, header)
     case chunk.kind:
       of LayerChunk:
+        echo("Loaded layer " & chunk.layer.name)
         result.layers.add(chunk.layer)
       of CelChunk:
-        result.layers[chunk.celData.layerIndex].cels.add(chunk.celData)
+        echo("Loaded cel " & $chunk.celData)
+        result.cels.add(chunk.celData)
       else: discard nil

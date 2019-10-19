@@ -20,6 +20,7 @@ type AsepriteImage* = ref object
   width*: int
   height*: int
   depth*: int
+  layers: seq[Layer]
   frames: seq[Frame]
 
 proc loadSprite*(path: string): AsepriteImage =
@@ -34,14 +35,33 @@ proc loadSprite*(path: string): AsepriteImage =
   result.depth = hdr.depth
 
   for frameIdx in 0 .. hdr.frames - 1:
-    result.frames.add(readFrame(stream, hdr))
+    let pFrame = readFrame(stream, hdr)
+    for layer in pFrame.layers:
+      result.layers.add(layer)
+    var frame: Frame
+    frame.duration = pFrame.duration
+    for cel in pFrame.cels:
+      frame.cels.add(cel)
+    result.frames.add(frame)
 
-proc numberOfFrames*(img: AsepriteImage): int = len(img.frames)
-proc numberOfLayers*(img: AsepriteImage, frame: int): int = len(img.frames[frame].layers)
-proc layerName*(img: AsepriteImage, frame: int, layer: int): string = img.frames[frame].layers[layer].name
-proc isLayerGroup*(img: AsepriteImage, frame: int, layer: int): bool = img.frames[frame].layers[layer].layerType == LayerType.Group
-proc getLayerLevel*(img: AsepriteImage, frame: int, layer: int): int = img.frames[frame].layers[layer].layerChildLevel
-proc isLayerVisible*(img: AsepriteImage, frame: int, layer: int): bool = img.frames[frame].layers[layer].visible
+proc numberOfFrames*(img: AsepriteImage): int =
+  len(img.frames)
+
+proc numberOfLayers*(img: AsepriteImage): int =
+  len(img.layers)
+
+proc layerName*(img: AsepriteImage, layer: int): string =
+  img.layers[layer].name
+
+proc isLayerGroup*(img: AsepriteImage, layer: int): bool =
+  img.layers[layer].layerType == LayerType.Group
+
+proc getLayerLevel*(img: AsepriteImage, layer: int): int =
+  img.layers[layer].layerChildLevel
+
+proc isLayerVisible*(img: AsepriteImage, layer: int): bool =
+  img.layers[layer].visible
+
 proc getFrameDuration*(img: AsepriteImage, frame: int): int =
   ## Returns the duration of a frame in milliseconds.
   img.frames[frame].duration
@@ -51,10 +71,9 @@ proc rasterizeLayer*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8
     let pixSize = (img.depth div 8)
     result.setLen(img.width * img.height * pixSize)
     let frame = img.frames[frame]
-    if layerIndex >= 0 and layerIndex < len(frame.layers):
-      let layer = frame.layers[layerIndex]
-      if layer.visible:
-        for cel in layer.cels:
+    if layerIndex >= 0 and layerIndex < len(img.layers):
+      for cel in frame.cels:
+        if cel.layerIndex == layerIndex:
           let imgHeight = img.height
           let imgWidth = img.width
           let celHeight = cel.details.height
@@ -70,7 +89,7 @@ proc rasterizeLayer*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8
                 result[offBuffer + b] = cel.details.pixelData[offCel + b]
               # TODO: This is fine if a layer only has one cel
               if cel.details.pixelData[offCel + 3] != 0:
-                result[offBuffer + 3] = cast[uint8](layer.opacity)
+                result[offBuffer + 3] = cast[uint8](img.layers[layerIndex].opacity)
     else:
       raise newException(IndexError, "Layer index is out of bounds!")
   else:
