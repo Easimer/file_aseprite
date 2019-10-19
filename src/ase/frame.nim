@@ -118,10 +118,18 @@ type Layer* = object
   opacity*: int
   name*: string
 
+type PaletteEntry* = object
+  Red*: int
+  Green*: int
+  Blue*: int
+  Alpha*: int
+  Name*: string
+
 type Chunk = ref object
   case kind: ChunkType
   of LayerChunk: layer: Layer
   of CelChunk: celData: CelData
+  of PaletteChunk: palette: seq[PaletteEntry]
   else: nil
 
 type Frame* = object
@@ -132,6 +140,7 @@ type PartialFrameData* = ref object
   duration*: int
   layers*: seq[Layer]
   cels*: seq[CelData]
+  palette*: seq[PaletteEntry]
 
 converter toLayerFlags(flags: uint16): HashSet[LayerFlags] =
   ## Converts a bitfield to a set of LayerFlags
@@ -224,6 +233,24 @@ proc readCelDetails(stream: FileStream, hdr: Header, chunkSize: uint32): CelData
       
     else: discard nil
 
+proc readPalette(stream: FileStream, hdr: Header, chunkSize: uint32): seq[PaletteEntry] =
+  # TODO: proper palette loading
+  let numEntries = stream.readUint32()
+  let firstEntryIdx = stream.readUint32()
+  let lastEntryIdx = stream.readUint32()
+  discard stream.readUint64()
+  for i in 0 .. numEntries - 1:
+    var entry: PaletteEntry
+    let flags = stream.readUint16()
+    entry.Red = int(stream.readUint8())
+    entry.Green = int(stream.readUint8())
+    entry.Blue = int(stream.readUint8())
+    entry.Alpha = int(stream.readUint8())
+    if (flags and 1) != 0:
+      let lenName = stream.readUint16().int()
+      entry.Name = stream.readStr(lenName)
+    result.add(entry)
+
 proc readChunk(stream: FileStream, hdr: Header): Chunk =
   ## Read a single chunk from the stream
   var chunkHeader: ChunkHeader
@@ -247,6 +274,8 @@ proc readChunk(stream: FileStream, hdr: Header): Chunk =
       result.layer.name = stream.readStr(cast[int](stream.readUint16()))
     of CelChunk:
       result.celData = readCelDetails(stream, hdr, chunkHeader.size)
+    of PaletteChunk:
+      result.palette = readPalette(stream, hdr, chunkHeader.size)
     else:
       # Skip chunk
       discard nil
@@ -278,4 +307,7 @@ proc readFrame*(stream: FileStream, header: Header): PartialFrameData =
       of CelChunk:
         echo("Loaded cel " & $chunk.celData)
         result.cels.add(chunk.celData)
+      of PaletteChunk:
+        echo("Loaded palette")
+        result.palette = chunk.palette
       else: discard nil

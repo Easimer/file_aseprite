@@ -22,6 +22,7 @@ type AsepriteImage* = ref object
   depth*: int
   layers: seq[Layer]
   frames: seq[Frame]
+  palette: seq[PaletteEntry]
 
 proc loadSprite*(path: string): AsepriteImage =
   new(result)
@@ -42,6 +43,9 @@ proc loadSprite*(path: string): AsepriteImage =
     frame.duration = pFrame.duration
     for cel in pFrame.cels:
       frame.cels.add(cel)
+    # TODO: proper palette loading
+    if len(pFrame.palette) != 0:
+      result.palette = pFrame.palette
     result.frames.add(frame)
 
 proc numberOfFrames*(img: AsepriteImage): int =
@@ -123,8 +127,42 @@ proc rasterizeLayerGreyscale*(img: AsepriteImage, frame: int, layerIndex: int): 
   else:
     raise newException(IndexError, "Frame index is out of bounds!")
 
+proc rasterizeLayerIndexed*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8] =
+  if frame >= 0 and frame < len(img.frames):
+    let pixSize = 1
+    let outPixSize = 4
+    result.setLen(img.width * img.height * outPixSize)
+    let frame = img.frames[frame]
+    if layerIndex >= 0 and layerIndex < len(img.layers):
+      for cel in frame.cels:
+        if cel.layerIndex == layerIndex:
+          let imgHeight = img.height
+          let imgWidth = img.width
+          let celHeight = cel.details.height
+          let celWidth = cel.details.width
+
+          for y in 0 .. celHeight - 1:
+            for x in 0 .. celWidth - 1:
+              let offY = cel.positionY + y
+              let offX = cel.positionX + x
+              let offBuffer = (offY * img.width + offX) * outPixSize
+              let offCel = (y * celWidth + x) * pixSize
+              let idx = cel.details.pixelData[offCel + 0]
+              let paletteEntry = img.palette[idx]
+              result[offBuffer + 0] = uint8(paletteEntry.Red)
+              result[offBuffer + 1] = uint8(paletteEntry.Green)
+              result[offBuffer + 2] = uint8(paletteEntry.Blue)
+              result[offBuffer + 3] = uint8(paletteEntry.Alpha)
+              if paletteEntry.Alpha != 0:
+                result[offBuffer + 3] = uint8(img.layers[layerIndex].opacity)
+    else:
+      raise newException(IndexError, "Layer index is out of bounds!")
+  else:
+    raise newException(IndexError, "Frame index is out of bounds!")
+
 proc rasterizeLayer*(img: AsepriteImage, frame: int, layerIndex: int): seq[uint8] =
   case img.depth:
     of 32: rasterizeLayerRGBA(img, frame, layerIndex)
+    of 8: rasterizeLayerIndexed(img, frame, layerIndex)
     of 16: rasterizeLayerGreyscale(img, frame, layerIndex)
     else: raise newException(RangeError, "Pixel depth of " & $img.depth & " is not supported!")
